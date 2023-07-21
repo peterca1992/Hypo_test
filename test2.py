@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta
 from sklearn.linear_model import LinearRegression
+import talib
+from talib import abstract
+
 
 
 #%%
@@ -170,24 +173,72 @@ for i in stock_list:
         df_yhat_table["nsd"] = yhat - np.std(y_train - yhat)
         df_yhat_table["n2sd"] = yhat - 2*np.std(y_train - yhat)
         
-        df_part["pos"] = df_part.apply(lambda x : pos_tr(x), axis = 1)
+        df_yhat_table["pos"] = df_yhat_table.apply(lambda x : pos_tr(x), axis = 1)
         
-        df_part["Date"] = df_adj_part['Date'].iloc[(j - 66):j].reset_index(drop = True)
+        df_yhat_table["Date"] = df_adj_part['Date'].iloc[(j - 30):j].reset_index(drop = True)
         
-        if(j == 66):
+        if(j == 30):
         
-            df_weight_part = pd.concat([df_weight_part, df_part[["Date", "pos"]]], axis = 0)
+            df_pos_part = pd.concat([df_pos_part, df_yhat_table[["Date", "pos"]]], axis = 0)
         
-        if(j != 66):
+        if(j != 30):
         
-            df_weight_part = pd.concat([df_weight_part, pd.DataFrame(df_part[["Date", "pos"]].iloc[-1]).T], axis = 0)
+            df_pos_part = pd.concat([df_pos_part, pd.DataFrame(df_yhat_table[["Date", "pos"]].iloc[-1]).T], axis = 0)
 
-
-
-
-
-
-
+    
+    df_adj_part = pd.merge(df_adj_part, df_pos_part, how = "left", on = "Date")
+    
+    #MA
+    df_5MA = pd.DataFrame(talib.SMA(df_adj_part[st_name].values, 5)).rename(columns = {0:"5MA"})
+    df_10MA = pd.DataFrame(talib.SMA(df_adj_part[st_name].values, 10)).rename(columns = {0:"10MA"})
+    df_22MA = pd.DataFrame(talib.SMA(df_adj_part[st_name].values, 22)).rename(columns = {0:"22MA"})
+    df_44MA = pd.DataFrame(talib.SMA(df_adj_part[st_name].values, 44)).rename(columns = {0:"44MA"})
+    df_66MA = pd.DataFrame(talib.SMA(df_adj_part[st_name].values, 66)).rename(columns = {0:"66MA"})
+    
+    df_adj_part = pd.concat([df_adj_part, df_5MA, df_10MA, df_22MA, df_44MA, df_66MA], axis = 1)
+    
+    ma_pos = []
+    ma_pos = np.append(ma_pos, [np.nan]*65).tolist()
+    
+    ma5_pos = []
+    ma5_pos = np.append(ma5_pos, [np.nan]*65).tolist()
+    
+    for k in range(65, len(df_adj_part)):
+        
+        if(df_adj_part["5MA"].iloc[k] > df_adj_part["10MA"].iloc[k] > df_adj_part["22MA"].iloc[k]):
+            ma_pos.append(1)
+            
+            #5ma上 或 由下往上 = 5ma 給1
+            if((df_adj_part[st_name].iloc[k] > df_adj_part["5MA"].iloc[k]) or ((df_adj_part[st_name].iloc[k-1] < df_adj_part["5MA"].iloc[k-1]) and (df_adj_part[st_name].iloc[k] == df_adj_part["5MA"].iloc[k]))):
+                ma5_pos.append(1)
+                
+            else:
+                ma5_pos.append(0)
+            
+        else:
+            
+            if(df_adj_part["5MA"].iloc[k] < df_adj_part["10MA"].iloc[k] < df_adj_part["22MA"].iloc[k]):
+                ma_pos.append(0)
+                
+                #5ma上 或 由下往上 = 5ma 給1
+                if((df_adj_part[st_name].iloc[k] > df_adj_part["5MA"].iloc[k]) or ((df_adj_part[st_name].iloc[k-1] < df_adj_part["5MA"].iloc[k-1]) and (df_adj_part[st_name].iloc[k] == df_adj_part["5MA"].iloc[k]))):
+                    ma5_pos.append(1)
+                    
+                else:
+                    ma5_pos.append(0)
+                
+            else:
+                ma_pos.append(0.5)
+                #5ma上 或 由下往上 = 5ma 給1
+                if((df_adj_part[st_name].iloc[k] > df_adj_part["5MA"].iloc[k]) or ((df_adj_part[st_name].iloc[k-1] < df_adj_part["5MA"].iloc[k-1]) and (df_adj_part[st_name].iloc[k] == df_adj_part["5MA"].iloc[k]))):
+                    ma5_pos.append(1)
+                    
+                else:
+                    ma5_pos.append(0)
+        
+    df_adj_part["ma_pos"] = ma_pos
+    df_adj_part["5ma_pos"] = ma5_pos
+            
 
 
 
